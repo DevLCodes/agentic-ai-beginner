@@ -131,8 +131,16 @@
   .score { position: sticky; bottom: 14px; text-align: center; margin-top: 18px; }
   .score span { background: var(--sticky); padding: 4px 18px; box-shadow: 2px 4px 10px rgba(0,0,0,.2); font-family: var(--title); }
   .sig { text-align: right; font-family: var(--title); color: var(--pencil); transform: rotate(-3deg); margin-top: 30px; }
+  /* step-by-step sticky notes (replaces the old 3D scenes) */
+  .walk { list-style: none; counter-reset: w; padding: 0; margin: 16px 0 34px; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px 18px; }
+  .walk li { counter-increment: w; background: var(--sticky); padding: 34px 16px 14px; position: relative; line-height: 1.45; font-size: .9em;
+             box-shadow: 2px 5px 10px rgba(40,60,90,.14); transform: rotate(-.8deg); }
+  .walk li:nth-child(4n+2) { background: var(--blue); transform: rotate(.7deg); }
+  .walk li:nth-child(4n+3) { background: var(--mint, #c8f0d8); transform: rotate(-.4deg); }
+  .walk li:nth-child(4n) { background: var(--pink); transform: rotate(.9deg); }
+  .walk li::before { content: counter(w); position: absolute; top: 6px; left: 14px; font-family: var(--title); font-size: 1.35em; color: var(--red); }
+  @media (prefers-reduced-motion: reduce) { .walk li { transform: none !important; } }
 </style>
-<link rel="stylesheet" href="assets/scene3d.css">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -166,14 +174,16 @@
     <span class="hl"><b>weighted sum of signals</b></span>: keyword match, meaning match, freshness, field, business rules.
     The weights decide what “relevant” means, so they deserve the same care as the model.</p>
 
-  <h3>See it in 3D: two retrievers, one scale</h3>
-  <figure class="fig3d" id="weights3d">
-    <div class="stage3d" role="img" aria-label="A question about Apple's FY2023 operating margin goes to a BM25 keyword index and a vector index; each returns a ranked list; a fusion scale weighs them with alpha, adds a recency boost, and sends one fused top-k list on to the reranker"><p class="hint3">3D · drag to turn</p><button class="reset3 ghost" type="button" hidden>Reset view</button><p class="nogl">The 3D view needs WebGL and a connection, because Three.js loads from a CDN. The labs below cover the same idea.</p></div>
-    <div class="ctl3"><button class="pp" type="button">Pause</button><span class="k">Step</span><div class="steps3"></div><span class="meta3"></span></div>
-    <div class="track3"><div class="fill3"></div></div>
-    <p class="out3" aria-live="polite"></p>
-    <figcaption>Illustrative. Yellow is the query, teal cubes are BM25 hits, purple shapes are vector hits, white sheets are the fused list.</figcaption>
-  </figure>
+  <h3>Step by step: two retrievers, one scale</h3>
+  <p>A question about Apple's FY2023 operating margin goes to a BM25 keyword index and a vector index; each returns a ranked list; a fusion scale weighs them with alpha, adds a recency boost, and sends one fused top-k list on to the reranker.</p>
+  <ol class="walk">
+    <li>A question arrives: “What was Apple’s FY2023 operating margin? (10-K 0000320193-23-000106)”. It is sent to two retrievers at once.</li>
+    <li>BM25 scores keyword overlap. It nails the accession number but gives scores from 0 to about 18, with no fixed ceiling.</li>
+    <li>The vector index scores meaning. It finds the income-statement table even though it never says “margin”, with cosines in a narrow 0.6–0.9 band.</li>
+    <li>Fusion: normalise both lists (or use ranks with RRF, k = 60), then weigh them. Here alpha = 0.3 for dense and 0.7 for BM25, tuned on a labelled set.</li>
+    <li>Soft boosts are added on top: a title or section-header match and a recency decay. Hard filters (ticker = AAPL, fiscal_year = 2023, permissions) were applied before scoring.</li>
+    <li>One fused top-k list goes out to the cross-encoder reranker (next page). Every weight is logged with the result, so the ranking can be explained and re-tuned.</li>
+  </ol>
 
   <!-- 1 -->
   <h2>1 · A score is a weighted sum</h2>
@@ -184,8 +194,8 @@
   </div>
   <table class="hand">
     <tr><th>signal</th><th>range</th><th>good at</th></tr>
-    <tr><td>BM25 (keyword)</td><td>0 to unbounded; depends on query length and corpus</td><td>exact IDs, tickers, accession numbers, rare terms (<a href="https://devlcodes.github.io/agentic-ai-notebook/system-design/search-types.html">search types</a>)</td></tr>
-    <tr><td>Dense cosine</td><td>−1 to 1, in practice a narrow band like 0.6–0.9</td><td>paraphrase: “how profitable” finds “operating income” (<a href="https://devlcodes.github.io/agentic-ai-notebook/system-design/embeddings.html">embeddings</a>)</td></tr>
+    <tr><td>BM25 (keyword)</td><td>0 to unbounded; depends on query length and corpus</td><td>exact IDs, tickers, accession numbers, rare terms</td></tr>
+    <tr><td>Dense cosine</td><td>−1 to 1, in practice a narrow band like 0.6–0.9</td><td>paraphrase: “how profitable” finds “operating income”</td></tr>
     <tr><td>Recency</td><td>0–1 after a decay function</td><td>“latest guidance”, policies, prices</td></tr>
     <tr><td>Field / metadata</td><td>a multiplier or additive bonus</td><td>title or section-header matches, the right form type</td></tr>
   </table>
@@ -238,7 +248,7 @@
       <p>Exponential decay with a <b>half-life</b>: <code>recency = 0.5^(age / half_life)</code>. With a 90-day half-life, a 90-day-old filing gets 0.5 and a 180-day-old one gets 0.25.</p>
       <h3>Filter or boost?</h3>
       <p><b>Filters are hard</b>: <code>WHERE fiscal_year = 2023</code> removes documents entirely. Use them when the question pins a value (ticker, year, permissions).
-        <b>Boosts are soft</b>: they reorder but never remove. Use them for preferences (“newer is usually better”). Never use a boost for access control (<a href="https://devlcodes.github.io/agentic-ai-notebook/system-design/access-control.html">access control</a>).</p>
+        <b>Boosts are soft</b>: they reorder but never remove. Use them for preferences (“newer is usually better”). Never use a boost for access control.</p>
     </div>
   </div>
   <h3>Lab C: “What is Apple’s latest guidance on gross margin?”</h3>
@@ -257,7 +267,7 @@
   <h2>4 · Choosing the weights</h2>
   <p>Weights are hyperparameters. Picking alpha by trying three queries and eyeballing the results is how teams ship a search that’s great on the demo and worse everywhere else.
     The repeatable way is a <b>grid search on a labelled set</b>: queries with graded relevance (2 = answers it, 1 = related, 0 = not), a metric such as NDCG@k or recall@k,
-    and one run per weight value (<a href="https://devlcodes.github.io/agentic-ai-notebook/system-design/evals.html">evals</a>, <a href="testing-and-evals.html">testing &amp; evals</a>).</p>
+    and one run per weight value (<a href="testing-and-evals.html">testing &amp; evals</a>).</p>
   <h3>Lab D: grid-search alpha</h3>
   <div class="box lab">
     <p style="margin:0 0 6px">Four labelled queries (an exact accession number, a paraphrase and two mixed ones), five candidates each, min-max normalised, NDCG@3 averaged.</p>
@@ -268,7 +278,7 @@
   <p>Three habits follow from that lab:</p>
   <ul>
     <li><b>Re-tune after any change to a signal.</b> A new embedding model, a new chunker or a new BM25 analyser shifts score distributions, and yesterday’s best alpha may now be wrong.</li>
-    <li><b>Tune per query type if they differ.</b> ID lookups want low alpha; open questions want high alpha. A <a href="https://devlcodes.github.io/agentic-ai-notebook/system-design/routing.html">router</a> can pick the profile.</li>
+    <li><b>Tune per query type if they differ.</b> ID lookups want low alpha; open questions want high alpha. A router can pick the profile.</li>
     <li><b>Hold out a test split.</b> Tune on one half of the labelled set and report on the other, or the score flatters you.</li>
   </ul>
   <p>When there are more than a handful of signals, hand-tuned weights stop scaling. <b>Learning to rank</b> (LTR) trains a model, often LambdaMART gradient-boosted trees, on
@@ -486,70 +496,6 @@ function renderScore() {
                                            : `score ${qr} / ${qd} · ${Q.length - qd} to go`;
 }
 renderScore();
-</script>
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
-  }
-}
-</script>
-<script type="module">
-import { boot } from './assets/scene3d.js';
-const D = {};
-D.weights3d = {
-  loop: 13,
-  view: { target: [0.6, 0, 0.4], w: 25, d: 15, el: 50 },
-  steps: [
-    { t: 0.0, text: 'A question arrives: “What was Apple’s FY2023 operating margin? (10-K 0000320193-23-000106)”. It is sent to two retrievers at once.' },
-    { t: 1.2, text: 'BM25 scores keyword overlap. It nails the accession number but gives scores from 0 to about 18, with no fixed ceiling.' },
-    { t: 2.4, text: 'The vector index scores meaning. It finds the income-statement table even though it never says “margin”, with cosines in a narrow 0.6–0.9 band.' },
-    { t: 4.0, text: 'Fusion: normalise both lists (or use ranks with RRF, k = 60), then weigh them. Here alpha = 0.3 for dense and 0.7 for BM25, tuned on a labelled set.' },
-    { t: 6.4, text: 'Soft boosts are added on top: a title or section-header match and a recency decay. Hard filters (ticker = AAPL, fiscal_year = 2023, permissions) were applied before scoring.' },
-    { t: 8.4, text: 'One fused top-k list goes out to the cross-encoder reranker (next page). Every weight is logged with the result, so the ranking can be explained and re-tuned.' },
-  ],
-  build(c) {
-    const { V, arc, P, C, THREE, rb, mesh } = c;
-    const usr = c.obj('person', -10.2, 0, 'Question', 'Apple FY2023 op. margin');
-    const bm = c.obj(c.SHAPES.server({ color: 0x3f6b55, emi: C.ingest }), -4.6, -3.4, 'BM25 index', 'scores 0 → ~18');
-    const vec = c.obj(c.SHAPES.database(C.kb), -4.6, 3.4, 'Vector index', 'cosine 0.6 → 0.9');
-
-    const sc = new THREE.Group(); sc.userData.glow = []; sc.userData.h = 2.6;
-    const base = mesh(new THREE.CylinderGeometry(0.8, 0.95, 0.18, 32), C.steel); base.position.y = 0.09; sc.add(base);
-    const post = mesh(new THREE.CylinderGeometry(0.09, 0.09, 2.0, 12), C.steel); post.position.y = 1.1; sc.add(post);
-    const beam = new THREE.Group(); beam.position.y = 2.15; sc.add(beam);
-    const bar = rb(0.3, 0.22, 4.2, C.serve, { r: 0.05 }); beam.add(bar); sc.userData.glow.push(bar);
-    for (const z of [-1.95, 1.95]) {
-      const pan = mesh(new THREE.CylinderGeometry(0.62, 0.45, 0.14, 28), z < 0 ? C.ingest : C.kb); pan.position.set(0, -0.55, z); beam.add(pan); sc.userData.glow.push(pan);
-      const str = mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.5, 6), 0x6b7684); str.position.set(0, -0.28, z); beam.add(str);
-    }
-    const fuse = c.obj(sc, 1.6, 0, 'Fusion', 'normalise · weigh · boost', { lift: 0.9 });
-    c.note('<b>0.7 × bm25</b>', 3.4, -2.2, 1.6);
-    c.note('<b>0.3 × dense</b>', 3.4, 2.4, 1.6);
-    const out = c.obj('cards', 7.0, 0, 'Fused top-k', 'ranked list');
-    const rr = c.obj('signpost', 10.6, 0, 'To reranker', '⑩ cross-encoder', { rot: 0 });
-
-    c.lane([V(-10.2, 0), V(-7.6, 0), V(-7.6, -3.4), V(-4.6, -3.4)]);
-    c.lane([V(-7.6, 0), V(-7.6, 3.4), V(-4.6, 3.4)]);
-    c.lane([V(-4.6, -3.4), V(-1.4, -3.4), V(-1.4, 0), V(1.6, 0)]);
-    c.lane([V(-4.6, 3.4), V(-1.4, 3.4), V(-1.4, 0)]);
-    c.lane([V(1.6, 0), V(7.0, 0), V(10.6, 0)]);
-
-    c.packet({ pts: [V(-10.2, 0), V(-7.6, 0), V(-7.6, -3.4), V(-4.6, -3.4)], t0: 0.2, t1: 1.2, kind: 'ask', from: usr, to: bm, label: 'query' });
-    c.packet({ pts: [V(-10.2, 0), V(-7.6, 0), V(-7.6, 3.4), V(-4.6, 3.4)], t0: 0.2, t1: 1.2, kind: 'ask', to: vec });
-    c.packet({ pts: [V(-4.6, -3.4), V(-1.4, -3.4), V(-1.4, 0), V(1.6, 0)], t0: 1.6, t1: 3.6, kind: 'chunk', n: 4, st: 0.18, to: fuse, label: 'bm25 list' });
-    c.packet({ pts: [V(-4.6, 3.4), V(-1.4, 3.4), V(-1.4, 0), V(1.6, 0)], t0: 2.6, t1: 4.2, kind: 'vec', n: 4, st: 0.18, to: fuse, label: 'dense list' });
-    c.packet({ pts: [V(1.6, 0), V(7.0, 0)], t0: 6.9, t1: 7.9, kind: 'doc', n: 5, st: 0.16, to: out, label: 'fused, ranked' });
-    c.packet({ pts: [V(7.0, 0), V(10.6, 0)], t0: 8.8, t1: 9.8, kind: 'doc', color: P.ans, to: rr, label: 'top 50' });
-
-    c.tick((t) => {
-      const a = t < 4.0 ? 0 : Math.min(1, (t - 4.0) / 0.8);
-      beam.rotation.x = -0.16 * a + (t > 4.8 && t < 6.4 ? 0.025 * Math.sin((t - 4.8) * 6) : 0);
-    });
-  },
-};
-boot(D);
 </script>
 </body>
 </html>

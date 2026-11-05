@@ -131,8 +131,16 @@
   .score { position: sticky; bottom: 14px; text-align: center; margin-top: 18px; }
   .score span { background: var(--sticky); padding: 4px 18px; box-shadow: 2px 4px 10px rgba(0,0,0,.2); font-family: var(--title); }
   .sig { text-align: right; font-family: var(--title); color: var(--pencil); transform: rotate(-3deg); margin-top: 30px; }
+  /* step-by-step sticky notes (replaces the old 3D scenes) */
+  .walk { list-style: none; counter-reset: w; padding: 0; margin: 16px 0 34px; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px 18px; }
+  .walk li { counter-increment: w; background: var(--sticky); padding: 34px 16px 14px; position: relative; line-height: 1.45; font-size: .9em;
+             box-shadow: 2px 5px 10px rgba(40,60,90,.14); transform: rotate(-.8deg); }
+  .walk li:nth-child(4n+2) { background: var(--blue); transform: rotate(.7deg); }
+  .walk li:nth-child(4n+3) { background: var(--mint, #c8f0d8); transform: rotate(-.4deg); }
+  .walk li:nth-child(4n) { background: var(--pink); transform: rotate(.9deg); }
+  .walk li::before { content: counter(w); position: absolute; top: 6px; left: 14px; font-family: var(--title); font-size: 1.35em; color: var(--red); }
+  @media (prefers-reduced-motion: reduce) { .walk li { transform: none !important; } }
 </style>
-<link rel="stylesheet" href="assets/scene3d.css">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -195,14 +203,17 @@
   <p class="lede">An answer with a number next to it is only useful if the number means something, and if something happens because of it.
     <span class="hl">Confidence is a <b>decision input</b>: answer, hedge, hand it to a human, or try a bigger model.</span> It is not a badge for the UI.</p>
 
-  <h3>See it in 3D: three questions through the gate</h3>
-  <figure class="fig3d" id="conf3d">
-    <div class="stage3d" role="img" aria-label="Four signals (retrieval, self-consistency, groundedness and a tool check) feed a confidence scorer, which sends a calibrated probability to a policy gate. The first question is answered, the second gets a hedged answer, and the third goes to an analyst queue, whose labels flow back to retrain the scorer"><p class="hint3">3D · drag to turn</p><button class="reset3 ghost" type="button" hidden>Reset view</button><p class="nogl">The 3D view needs WebGL and a connection, because Three.js loads from a CDN. The labs below cover the same idea.</p></div>
-    <div class="ctl3"><button class="pp" type="button">Pause</button><span class="k">Step</span><div class="steps3"></div><span class="meta3"></span></div>
-    <div class="track3"><div class="fill3"></div></div>
-    <p class="out3" aria-live="polite"></p>
-    <figcaption>Illustrative. Grey spheres are signal values, purple shapes are the scorer’s probability, flat cards are what the user or analyst receives.</figcaption>
-  </figure>
+  <h3>Step by step: three questions through the gate</h3>
+  <p>Four signals (retrieval, self-consistency, groundedness and a tool check) feed a confidence scorer, which sends a calibrated probability to a policy gate. The first question is answered, the second gets a hedged answer, and the third goes to an analyst queue, whose labels flow back to retrain the scorer.</p>
+  <ol class="walk">
+    <li>Question 1: “What was Apple’s FY2023 operating margin?” Four signals report: top rerank score 0.94 with a clear lead, 5 of 5 samples agree, every claim is supported by a cited chunk, and the calculator matches the XBRL fact.</li>
+    <li>The scorer, a logistic regression fitted on labelled answers, turns them into p = 0.99. Because it is calibrated, about 99 in 100 answers at this score are right.</li>
+    <li>p is at least 0.80, so the gate answers: 29.8%, with citations to the 10-K.</li>
+    <li>Question 2: “What was Apple’s margin in 2023?” Retrieval is weaker (0.78), and only 2 of 5 samples agree: they split between gross, operating and net margin.</li>
+    <li>p = 0.53 lands in the hedge band: show all three margins with sources and ask which one was meant.</li>
+    <li>Question 3: the calculator’s result does not match the XBRL value. A hard rule sends it to the analyst queue, whatever the blended score says.</li>
+    <li>The analyst’s decision becomes a new label. Labels flow back to re-fit the scorer and its calibration, especially after a model or index change.</li>
+  </ol>
 
   <div class="box">
     <table class="hand">
@@ -210,7 +221,7 @@
       <tr><td>high</td><td>answer, with citations</td><td>“Apple’s FY2023 operating margin was 29.8% (10-K, Item 8).”</td></tr>
       <tr><td>middle</td><td>hedge: answer with the caveat, or ask a clarifying question</td><td>“Did you mean gross (44.1%), operating (29.8%) or net (25.3%) margin?”</td></tr>
       <tr><td>low</td><td>abstain and escalate to a person</td><td>sent to the analyst queue with the evidence attached</td></tr>
-      <tr><td>low, but cheap to retry</td><td>route to a bigger model or a deeper search, then score again</td><td>see <a href="https://devlcodes.github.io/agentic-ai-notebook/system-design/routing.html">routing</a></td></tr>
+      <tr><td>low, but cheap to retry</td><td>route to a bigger model or a deeper search, then score again</td><td>a router picks the bigger path</td></tr>
     </table>
   </div>
 
@@ -319,7 +330,7 @@
     <li><b>A hard rule beats a score</b>: a calculator mismatch or a failed <a href="ai-governance.html">guardrail</a> escalates whatever the blend says.</li>
   </ul>
   <h3>Watching it in production</h3>
-  <p>Track the <b>escalation rate</b> per day and per segment. A sudden drop after a new embedding model, reranker or index usually means the score distribution moved, not that the system got better. <span class="hl">Re-fit the calibration on the labelled set after every model or index change</span>, and feed analyst decisions from the queue back in as new labels (see <a href="https://devlcodes.github.io/agentic-ai-notebook/system-design/evals.html">evals</a> and <a href="testing-and-evals.html">Testing &amp; Evals</a>).</p>
+  <p>Track the <b>escalation rate</b> per day and per segment. A sudden drop after a new embedding model, reranker or index usually means the score distribution moved, not that the system got better. <span class="hl">Re-fit the calibration on the labelled set after every model or index change</span>, and feed analyst decisions from the queue back in as new labels (see <a href="testing-and-evals.html">Testing &amp; Evals</a>).</p>
 
   <div class="cols">
     <div class="sticky">
@@ -568,61 +579,6 @@ function renderScore() {
 renderScore();
 </script>
 
-</script>
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
-  }
-}
-</script>
-<script type="module">
-import { boot } from './assets/scene3d.js';
-const D = {};
-D.conf3d = {
-  loop: 13.5,
-  view: { target: [0, 0, 0], w: 24, d: 17, el: 54 },
-  steps: [
-    { t: 0.0, text: 'Question 1: “What was Apple’s FY2023 operating margin?” Four signals report: top rerank score 0.94 with a clear lead, 5 of 5 samples agree, every claim is supported by a cited chunk, and the calculator matches the XBRL fact.' },
-    { t: 1.5, text: 'The scorer, a logistic regression fitted on labelled answers, turns them into p = 0.99. Because it is calibrated, about 99 in 100 answers at this score are right.' },
-    { t: 2.3, text: 'p is at least 0.80, so the gate answers: 29.8%, with citations to the 10-K.' },
-    { t: 4.2, text: 'Question 2: “What was Apple’s margin in 2023?” Retrieval is weaker (0.78), and only 2 of 5 samples agree: they split between gross, operating and net margin.' },
-    { t: 5.8, text: 'p = 0.53 lands in the hedge band: show all three margins with sources and ask which one was meant.' },
-    { t: 8.4, text: 'Question 3: the calculator’s result does not match the XBRL value. A hard rule sends it to the analyst queue, whatever the blended score says.' },
-    { t: 10.6, text: 'The analyst’s decision becomes a new label. Labels flow back to re-fit the scorer and its calibration, especially after a model or index change.' },
-  ],
-  build(c) {
-    const { V, arc, P, C, SHAPES } = c;
-    const SIG = [
-      [SHAPES.database(C.kb), -5.4, 'Retrieval', 'rerank score · margin'],
-      ['cards', -1.8, 'Self-consistency', 'N samples agree?'],
-      [SHAPES.shield(C.gov), 1.8, 'Groundedness', 'claims supported'],
-      [SHAPES.server({ color: 0x3f6b55, emi: C.ok }), 5.4, 'Tool check', 'calculator = XBRL'],
-    ].map(([s, z, n, sub]) => [c.obj(s, -9.4, z, n, sub), z]);
-    const sc = c.obj('monitor', -2.6, 0, 'Confidence scorer', 'calibrated p');
-    const gate = c.obj('signpost', 2.6, 0, 'Policy gate', '≥ 0.80 · 0.50–0.80 · < 0.50');
-    const OUT = [
-      [c.obj('person', 8.8, -4.8, 'Answer', 'with citations'), -4.8],
-      [c.obj('browser', 8.8, 0, 'Hedged answer', 'caveat + sources'), 0],
-      [c.obj('tray', 8.8, 4.8, 'Analyst queue', 'human review'), 4.8],
-    ];
-    SIG.forEach(([, z]) => c.lane([V(-9.4, z), V(-6.2, z), V(-6.2, 0), V(-2.6, 0)]));
-    c.lane([V(-2.6, 0), V(2.6, 0)]);
-    OUT.forEach(([, z]) => c.lane([V(2.6, 0), V(5.8, 0), V(5.8, z), V(8.8, z)]));
-    const round = (t0, p, color, out, label) => {
-      SIG.forEach(([o, z], i) => c.packet({ pts: [V(-9.4, z), V(-6.2, z), V(-6.2, 0), V(-2.6, 0)], t0: t0 + i * 0.12, t1: t0 + 1.2 + i * 0.12, kind: 'span', s: 1.5, from: o, to: sc }));
-      c.packet({ pts: arc(c.top(sc, 0), c.top(gate, 0), 1.6), t0: t0 + 1.6, t1: t0 + 2.3, kind: 'vec', to: gate, label: p });
-      const [o, z] = OUT[out];
-      c.packet({ pts: [V(2.6, 0), V(5.8, 0), V(5.8, z), V(8.8, z)], t0: t0 + 2.4, t1: t0 + 3.4, kind: 'doc', color, to: o, label });
-    };
-    round(0, 'p = 0.99', P.ship, 0, '29.8% + citations');
-    round(4.2, 'p = 0.53', P.env, 1, 'which margin?');
-    round(8.4, 'tool mismatch', P.bad, 2, 'needs review');
-    c.packet({ pts: arc(c.top(OUT[2][0], 0), c.top(sc, 0), 3.2), t0: 11.3, t1: 12.6, kind: 'span', s: 1.6, color: P.ask, to: sc, label: 'labels → re-fit' });
-  },
-};
-boot(D);
 </script>
 </body>
 </html>

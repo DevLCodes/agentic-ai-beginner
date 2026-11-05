@@ -2,12 +2,6 @@
 
 Every page in this repo uses one look: a hand-written notebook on a desk. It's for engineers learning agents for the first time, so the voice is friendly and step by step, one idea at a time, with lots of "try this".
 
-Deeper, numbers-heavy material lives elsewhere in a different (field-manual) style:
-- Agentic system designs: https://devlcodes.github.io/agentic-ai-notebook/system-design/
-- Classic system design: https://github.com/DevLCodes/classic-system-designs
-
-Link out to those freely ("go deeper"), but don't borrow their components.
-
 | | |
 | --- | --- |
 | Feel | Ruled paper, sticky notes, highlighter, doodles |
@@ -30,9 +24,9 @@ Link out to those freely ("go deeper"), but don't borrow their components.
 - `.cards` quiz: sticky-note cards with option buttons, right/wrong colouring, and a `.why` reveal. Every concept page ends with one.
 - Progress lives on the roadmap (`index.html`) in `localStorage`.
 
-- `.fig3d`: a few concept pages embed a 3D scene via `assets/scene3d.js` + `assets/scene3d.css` (three@0.160.0 importmap). The field-manual palette is scoped to `.fig3d` so it never leaks into the notebook. Use it sparingly, for one mechanism a flat doodle can't show.
+- `ol.walk`: a numbered row of sticky notes that walks through one run of a mechanism step by step (one note per step, colours cycling yellow, blue, mint, pink). Introduce it with an `h3` "Step by step: …" and a one-sentence summary. This is how a page shows a flow over time; there are no 3D or animated scenes.
 
-**Don't**: load web fonts, use the grey palette outside `.fig3d`, or write long tables of numbers. If a section needs that depth, it belongs on the [agentic system design site](https://devlcodes.github.io/agentic-ai-notebook/system-design/), with a link from the concept page.
+**Don't**: load web fonts, use 3D/WebGL scenes or any CDN script, use the grey field-manual palette, or write long tables of numbers. Keep pages self-contained: this site doesn't link out to other DevLCodes sites.
 
 ## Checklist for a new page
 1. Copy the `:root` tokens and base CSS from `agentic-loop.html`, not from memory.

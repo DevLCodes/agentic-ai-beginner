@@ -131,8 +131,16 @@
   .score { position: sticky; bottom: 14px; text-align: center; margin-top: 18px; }
   .score span { background: var(--sticky); padding: 4px 18px; box-shadow: 2px 4px 10px rgba(0,0,0,.2); font-family: var(--title); }
   .sig { text-align: right; font-family: var(--title); color: var(--pencil); transform: rotate(-3deg); margin-top: 30px; }
+  /* step-by-step sticky notes (replaces the old 3D scenes) */
+  .walk { list-style: none; counter-reset: w; padding: 0; margin: 16px 0 34px; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px 18px; }
+  .walk li { counter-increment: w; background: var(--sticky); padding: 34px 16px 14px; position: relative; line-height: 1.45; font-size: .9em;
+             box-shadow: 2px 5px 10px rgba(40,60,90,.14); transform: rotate(-.8deg); }
+  .walk li:nth-child(4n+2) { background: var(--blue); transform: rotate(.7deg); }
+  .walk li:nth-child(4n+3) { background: var(--mint, #c8f0d8); transform: rotate(-.4deg); }
+  .walk li:nth-child(4n) { background: var(--pink); transform: rotate(.9deg); }
+  .walk li::before { content: counter(w); position: absolute; top: 6px; left: 14px; font-family: var(--title); font-size: 1.35em; color: var(--red); }
+  @media (prefers-reduced-motion: reduce) { .walk li { transform: none !important; } }
 </style>
-<link rel="stylesheet" href="assets/scene3d.css">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -176,15 +184,16 @@
   <p class="lede">A citation is a promise: <i>this sentence came from that source</i>. The model writes the promise.
     <span class="hl"><b>Your code checks it</b></span> before anyone reads the answer.</p>
 
-  <!-- ============ 3D ============ -->
-  <h3>See it in 3D: every sentence tethered to its source</h3>
-  <figure class="fig3d" id="cite3d">
-    <div class="stage3d" role="img" aria-label="Four retrieved sources, each with a stable id, flow into the model. The model writes three sentences, each carrying the ids it used. A verifier checks each one: two pass and get green tethers back to their source chunks; the third cites c77, which was never retrieved, so its red tether is cut and the sentence is dropped before the answer reaches the reader."><p class="hint3">3D · drag to turn</p><button class="reset3 ghost" type="button" hidden>Reset view</button><p class="nogl">The 3D view needs WebGL and a connection, because Three.js loads from a CDN. The labs below cover the same idea.</p></div>
-    <div class="ctl3"><button class="pp" type="button">Pause</button><span class="k">Step</span><div class="steps3"></div><span class="meta3"></span></div>
-    <div class="track3"><div class="fill3"></div></div>
-    <p class="out3" aria-live="polite"></p>
-    <figcaption>Illustrative. Cubes are retrieved sources with their ids, flat cards are answer sentences, lines are citation tethers.</figcaption>
-  </figure>
+  <h3>Step by step: every sentence tethered to its source</h3>
+  <p>Four retrieved sources, each with a stable id, flow into the model. The model writes three sentences, each carrying the ids it used. A verifier checks each one: two pass and get green tethers back to their source chunks; the third cites c77, which was never retrieved, so its red tether is cut and the sentence is dropped before the answer reaches the reader..</p>
+  <ol class="walk">
+    <li>Retrieval hands the model four sources, each carrying a stable id set at ingestion: c41 (income statement, p.28), c52, c18, and calc-1, a calculator tool output.</li>
+    <li>The model writes the answer one sentence at a time, and each sentence carries the ids it relied on.</li>
+    <li>Before anyone sees it, a verifier in code checks each sentence: was the cited id retrieved, is the quote in that source, does every number appear there?</li>
+    <li>Two sentences pass. Each gets a tether back to its exact source, which is what the reader’s hover and click will follow.</li>
+    <li>The third sentence cites c77, which was never retrieved. Its tether has nothing to land on, so it is cut and the sentence is dropped.</li>
+    <li>The reader gets two sentences, each sourced: “29.8% [c41][calc-1]”. The verifier’s drop rate is logged as the unsupported-claim rate.</li>
+  </ol>
 
   <!-- 1. Why and grain -->
   <h2>1 · Why cite, and at what grain</h2>
@@ -296,9 +305,8 @@ def verify(sentence, cites, quote, retrieved, calc):
     <b>Unsupported-claim rate</b><span>In production: the share of sentences your verifier dropped or flagged. A rise after a prompt or model change is a regression alarm, no labels needed.</span>
   </div>
   <p style="margin-top:18px">Citation metrics measure whether the answer is <b>grounded</b>, not whether it is <b>right</b>. A sentence can faithfully cite
-    a wrong or out-of-date chunk. Keep answer-correctness evals (see <a href="testing-and-evals.html">⑥ Testing &amp; Evals</a> and
-    <a href="https://devlcodes.github.io/agentic-ai-notebook/system-design/evals.html">RAG evals</a>) alongside them. And citations can only point at what retrieval found, so recall upstream
-    (<a href="https://devlcodes.github.io/agentic-ai-notebook/system-design/vector-search.html">vector search</a>, <a href="reranking-cross-encoders.html">reranking</a>) still sets the ceiling.</p>
+    a wrong or out-of-date chunk. Keep answer-correctness evals (see <a href="testing-and-evals.html">⑥ Testing &amp; Evals</a>) alongside them. And citations can only point at what retrieval found, so recall upstream
+    (vector search, <a href="reranking-cross-encoders.html">reranking</a>) still sets the ceiling.</p>
   <p>On screen, make checking cheap: hover a marker to see the exact span highlighted, click to open the filing at that page
     (an EDGAR document URL plus a page anchor), and keep the chunk id in the trace so an audit can replay it.</p>
 
@@ -517,76 +525,6 @@ function renderScore() {
                                            : `score ${qr} / ${qd} · ${Q.length - qd} to go`;
 }
 renderScore();
-</script>
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
-  }
-}
-</script>
-<script type="module">
-import { boot } from './assets/scene3d.js';
-const D = {};
-D.cite3d = {
-  loop: 14,
-  view: { target: [0.6, 0, 0.8], w: 25, d: 16, el: 50 },
-  steps: [
-    { t: 0.0, text: 'Retrieval hands the model four sources, each carrying a stable id set at ingestion: c41 (income statement, p.28), c52, c18, and calc-1, a calculator tool output.' },
-    { t: 2.4, text: 'The model writes the answer one sentence at a time, and each sentence carries the ids it relied on.' },
-    { t: 4.4, text: 'Before anyone sees it, a verifier in code checks each sentence: was the cited id retrieved, is the quote in that source, does every number appear there?' },
-    { t: 6.0, text: 'Two sentences pass. Each gets a tether back to its exact source, which is what the reader’s hover and click will follow.' },
-    { t: 8.4, text: 'The third sentence cites c77, which was never retrieved. Its tether has nothing to land on, so it is cut and the sentence is dropped.' },
-    { t: 11.0, text: 'The reader gets two sentences, each sourced: “29.8% [c41][calc-1]”. The verifier’s drop rate is logged as the unsupported-claim rate.' },
-  ],
-  build(c) {
-    const { V, V3, arc, P, C, THREE, mesh } = c;
-    const SZ = [-4.5, -1.5, 1.5, 4.5];
-    const srcs = [
-      c.obj(c.SHAPES.sheet(0xfdfbf3), -9, SZ[0], 'c41', 'Item 8 · p.28'),
-      c.obj(c.SHAPES.sheet(0xfdfbf3), -9, SZ[1], 'c52', 'Item 7 · opex'),
-      c.obj(c.SHAPES.sheet(0xfdfbf3), -9, SZ[2], 'c18', 'Item 7 · segments'),
-      c.obj(c.SHAPES.server({ color: 0x5b4b8a, emi: C.model }), -9, SZ[3], 'calc-1', 'tool output'),
-    ];
-    srcs.slice(0, 3).forEach(g => g.scale.setScalar(1.7));
-    const llm = c.obj('modelGem', -3.2, 0, 'Model', 'writes sentences + ids');
-    const ver = c.obj('shield', 2.2, 0, 'Verifier', 'id · quote · numbers');
-    const sz = [-3.2, 0, 3.2];
-    const outs = sz.map((z, i) => c.obj(c.SHAPES.sheet(i === 2 ? 0xffd9d3 : 0xe6f6ea), 7.4, z, ['s1 ✓', 's2 ✓', 's3 ✗'][i], ['c41', 'calc-1', 'c77 · dropped'][i]));
-    outs.forEach(g => g.scale.setScalar(1.7));
-    const rdr = c.obj('person', 11.4, 0, 'Reader', 'hover → source span');
-    c.note('c77 ?  never retrieved', -9, 7.2);
-    for (const z of SZ) c.lane([V(-9, z), V(-6, z), V(-6, 0), V(-3.2, 0)]);
-    c.lane([V(-3.2, 0), V(2.2, 0)]);
-    for (const z of sz) c.lane([V(2.2, 0), V(4.8, 0), V(4.8, z), V(7.4, z)]);
-    c.lane([V(7.4, 0), V(11.4, 0)]);
-    ['c41', 'c52', 'c18', 'calc-1'].forEach((id, i) =>
-      c.packet({ pts: [V(-9, SZ[i]), V(-6, SZ[i]), V(-6, 0), V(-3.2, 0)], t0: 0.3 + i * 0.35, t1: 1.6 + i * 0.35, from: srcs[i], to: llm, label: id }));
-    ['s1 [c41]', 's2 [calc-1]', 's3 [c77]'].forEach((l, i) =>
-      c.packet({ pts: [V(-3.2, 0), V(2.2, 0)], t0: 2.6 + i * 0.55, t1: 3.6 + i * 0.55, kind: 'doc', from: llm, to: ver, label: l }));
-    c.pulse(ver, 4.6, 5.2, 5.8);
-    c.packet({ pts: [V(2.2, 0), V(4.8, 0), V(4.8, sz[0]), V(7.4, sz[0])], t0: 6.0, t1: 6.8, kind: 'doc', color: P.ship, to: outs[0], label: '✓ s1' });
-    c.packet({ pts: [V(2.2, 0), V(4.8, 0), V(4.8, sz[1]), V(7.4, sz[1])], t0: 6.4, t1: 7.2, kind: 'doc', color: P.ship, to: outs[1], label: '✓ s2' });
-    c.packet({ pts: [V(2.2, 0), V(4.8, 0), V(4.8, sz[2]), V(7.4, sz[2])], t0: 8.0, t1: 8.6, kind: 'doc', color: P.bad, to: outs[2], label: '✗ s3 · c77' });
-    c.show(outs[0], 6.8); c.show(outs[1], 7.2); c.show(outs[2], 8.6, 10.8, 'drop');
-    const tether = (a, b, h, color) => {
-      const m = mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(arc(a, b, h, 40)), 64, 0.045, 6, false), color, { glow: 0.6, cast: false });
-      c.scene.add(m); m.visible = false; return m;
-    };
-    const t1 = tether(new V3(7.4, 0.2, sz[0]), new V3(-9, 0.2, SZ[0]), 3.4, P.ship);
-    const t2 = tether(new V3(7.4, 0.2, sz[1]), new V3(-9, 1.4, SZ[3]), 2.8, P.ship);
-    const t3 = tether(new V3(7.4, 0.2, sz[2]), new V3(-9, 0.2, 7.2), 2.6, P.bad);
-    c.packet({ pts: [V(7.4, 0), V(11.4, 0)], t0: 11.0, t1: 12.0, kind: 'doc', color: P.ans, to: rdr, label: '2 sentences · each sourced' });
-    c.pulse(srcs[0], 7.4); c.pulse(srcs[3], 7.8);
-    c.tick((t) => {
-      t1.visible = t >= 6.9; t2.visible = t >= 7.3;
-      t3.visible = t >= 8.7 && t < 10.6;
-      t3.position.y = t > 9.8 ? -2.2 * Math.pow((t - 9.8) / 0.8, 2) : 0;
-    });
-  },
-};
-boot(D);
 </script>
 </body>
 </html>

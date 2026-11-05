@@ -22,7 +22,7 @@ Every page in this repo looks like one sheet of a hand-written notebook lying on
 3. Structure the page: a header with the topic title in `--title`, then numbered `h2` parts (`1 · …`, `2 · …`), each introduced by a one-line `.lede`. Use a red uppercase `.part` label when the page has several parts.
 4. Add at least one hands-on element: a clickable `svg.doodle` diagram, a small lab with buttons and an `.out` panel, or a step-through.
 5. End with the sticky-note quiz (`.cards`), with options, right and wrong colouring, and a `.why` reveal.
-6. Add the page to the roadmap in `index.html` (the `T` array that draws the ring, or the numbered `ol.topic-list` for the retrieval and model track) and to the README topic list.
+6. Add the page to the roadmap in `index.html` (the `T` array that draws the ring) and to the README topic list.
 
 ## Components to reach for
 

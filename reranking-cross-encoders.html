@@ -131,8 +131,16 @@
   .score { position: sticky; bottom: 14px; text-align: center; margin-top: 18px; }
   .score span { background: var(--sticky); padding: 4px 18px; box-shadow: 2px 4px 10px rgba(0,0,0,.2); font-family: var(--title); }
   .sig { text-align: right; font-family: var(--title); color: var(--pencil); transform: rotate(-3deg); margin-top: 30px; }
+  /* step-by-step sticky notes (replaces the old 3D scenes) */
+  .walk { list-style: none; counter-reset: w; padding: 0; margin: 16px 0 34px; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 20px 18px; }
+  .walk li { counter-increment: w; background: var(--sticky); padding: 34px 16px 14px; position: relative; line-height: 1.45; font-size: .9em;
+             box-shadow: 2px 5px 10px rgba(40,60,90,.14); transform: rotate(-.8deg); }
+  .walk li:nth-child(4n+2) { background: var(--blue); transform: rotate(.7deg); }
+  .walk li:nth-child(4n+3) { background: var(--mint, #c8f0d8); transform: rotate(-.4deg); }
+  .walk li:nth-child(4n) { background: var(--pink); transform: rotate(.9deg); }
+  .walk li::before { content: counter(w); position: absolute; top: 6px; left: 14px; font-family: var(--title); font-size: 1.35em; color: var(--red); }
+  @media (prefers-reduced-motion: reduce) { .walk li { transform: none !important; } }
 </style>
-<link rel="stylesheet" href="assets/scene3d.css">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -182,18 +190,17 @@
   <p class="nav muted"><a href="index.html">⌂ Home</a><a href="retrieval-weights.html">← Weights in Retrieval</a><a href="citations.html">⑪ Citations →</a></p>
   <h1>Reranking with Cross-Encoders</h1>
   <p class="lede">Vector search finds fifty chunks that <i>look</i> like the question. A cross-encoder reads each one <i>together</i> with the question
-    and decides which actually answers it. <span class="hl">Retrieve wide for recall, rerank narrow for precision.</span>
-    The <a href="https://devlcodes.github.io/agentic-ai-notebook/system-design/reranking.html">reranking topic page</a> has the short version; this notebook opens the model up.</p>
+    and decides which actually answers it. <span class="hl">Retrieve wide for recall, rerank narrow for precision.</span></p>
 
-  <!-- ============ 3D ============ -->
-  <h3>See it in 3D: from fifty lookalikes to five answers</h3>
-  <figure class="fig3d" id="rerank3d">
-    <div class="stage3d" role="img" aria-label="A question goes to a vector index, which returns a wide fan of candidate chunks; each candidate enters a cross-encoder press paired with the question, gets one relevance score, and only the top five, re-ordered, go on to the language model prompt"><p class="hint3">3D · drag to turn</p><button class="reset3 ghost" type="button" hidden>Reset view</button><p class="nogl">The 3D view needs WebGL and a connection, because Three.js loads from a CDN. The diagrams below cover the same idea.</p></div>
-    <div class="ctl3"><button class="pp" type="button">Pause</button><span class="k">Step</span><div class="steps3"></div><span class="meta3"></span></div>
-    <div class="track3"><div class="fill3"></div></div>
-    <p class="out3" aria-live="polite"></p>
-    <figcaption>Illustrative. The yellow sphere is the question, teal blocks are candidate chunks, and white sheets are the re-ordered top five.</figcaption>
-  </figure>
+  <h3>Step by step: from fifty lookalikes to five answers</h3>
+  <p>A question goes to a vector index, which returns a wide fan of candidate chunks; each candidate enters a cross-encoder press paired with the question, gets one relevance score, and only the top five, re-ordered, go on to the language model prompt.</p>
+  <ol class="walk">
+    <li>A user asks “What was Apple’s FY2023 operating margin?” The question is embedded once and sent to the vector index (HNSW in pgvector, Qdrant, Pinecone…).</li>
+    <li>Retrieve wide: the index returns the top 50–100 chunks by cosine in a few milliseconds. Recall is good, but the order is not: gross margin, FY2022 figures and a contents line all look similar.</li>
+    <li>Rerank: each candidate enters the cross-encoder paired with the question, as one input. Full attention between their tokens produces one relevance score per pair.</li>
+    <li>The scores re-order the list. Lookalikes sink; the FY2023 statement of operations rises to rank 1. Cost: one model pass per candidate, so only the shortlist is reranked.</li>
+    <li>Keep narrow: the top five go into the prompt, and the model computes 114,301 ÷ 383,285 ≈ 29.8%, citing the chunk it used.</li>
+  </ol>
 
   <!-- 1 -->
   <h2>1 · Two ways to score a pair</h2>
@@ -283,7 +290,7 @@
         <li><b>Shorter pairs.</b> Rerank the chunk, not the parent section. Truncate to the model’s trained length (often 512).</li>
         <li><b>Batch on a GPU.</b> All pairs for one query go in one or a few batches; padding to similar lengths helps.</li>
         <li><b>Smaller model or distilled model.</b> A 22M-parameter MiniLM is many times cheaper than a 568M-parameter bge-reranker-v2-m3.</li>
-        <li><b>Skip when easy.</b> If the first stage is confident (an exact ID match, one dominant hit), don’t rerank at all; see <a href="https://devlcodes.github.io/agentic-ai-notebook/system-design/routing.html">routing</a>.</li>
+        <li><b>Skip when easy.</b> If the first stage is confident (an exact ID match, one dominant hit), don’t rerank at all.</li>
       </ul>
     </div>
     <div>
@@ -345,10 +352,10 @@
   </ul>
 
   <h3>How to tell if it helped</h3>
-  <p>Run the same golden set twice, with and without the reranker, and compare <b>NDCG@10</b> and <b>MRR</b> (see <a href="https://devlcodes.github.io/agentic-ai-notebook/system-design/evals.html">evals</a>
-    and <a href="testing-and-evals.html">Testing &amp; Evals</a>). Also log <b>first-stage recall@k</b>: if the right chunk isn’t in the 100
-    candidates, no reranker can rescue it, as the lab’s “never retrieved” box shows. Fix recall with <a href="https://devlcodes.github.io/agentic-ai-notebook/system-design/search-types.html">hybrid search</a>,
-    better <a href="https://devlcodes.github.io/agentic-ai-notebook/system-design/embeddings.html">embeddings</a> or chunking, then rerank.</p>
+  <p>Run the same golden set twice, with and without the reranker, and compare <b>NDCG@10</b> and <b>MRR</b> (see
+    <a href="testing-and-evals.html">Testing &amp; Evals</a>). Also log <b>first-stage recall@k</b>: if the right chunk isn’t in the 100
+    candidates, no reranker can rescue it, as the lab’s “never retrieved” box shows. Fix recall with hybrid search,
+    better embeddings or chunking, then rerank.</p>
 
   <div class="cols">
     <div class="sticky">
@@ -549,59 +556,6 @@ function renderScore() {
                                            : `score ${qr} / ${qd} · ${Q.length - qd} to go`;
 }
 renderScore();
-</script>
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
-  }
-}
-</script>
-<script type="module">
-import { boot } from './assets/scene3d.js';
-const D = {};
-D.rerank3d = {
-  loop: 14,
-  view: { target: [0, 0, 0.4], w: 25, d: 15, el: 50 },
-  steps: [
-    { t: 0.0, text: 'A user asks “What was Apple’s FY2023 operating margin?” The question is embedded once and sent to the vector index (HNSW in pgvector, Qdrant, Pinecone…).' },
-    { t: 1.6, text: 'Retrieve wide: the index returns the top 50–100 chunks by cosine in a few milliseconds. Recall is good, but the order is not: gross margin, FY2022 figures and a contents line all look similar.' },
-    { t: 3.6, text: 'Rerank: each candidate enters the cross-encoder paired with the question, as one input. Full attention between their tokens produces one relevance score per pair.' },
-    { t: 7.9, text: 'The scores re-order the list. Lookalikes sink; the FY2023 statement of operations rises to rank 1. Cost: one model pass per candidate, so only the shortlist is reranked.' },
-    { t: 10.1, text: 'Keep narrow: the top five go into the prompt, and the model computes 114,301 ÷ 383,285 ≈ 29.8%, citing the chunk it used.' },
-  ],
-  build(c) {
-    const { V, arc, P, C, rb } = c;
-    const usr = c.obj('person', -11, 0, 'User', 'asks a question');
-    const idx = c.obj(c.SHAPES.database(C.kb, { r: 1.2 }), -6.2, 0, 'Vector index', 'top 100 by cosine · ms');
-    const press = new c.THREE.Group();
-    const add = (m, x, y) => { m.position.set(x, y, 0); press.add(m); return m; };
-    const base = add(rb(2.6, 0.5, 2.0, 0x3b3f58, { r: 0.08 }), 0, 0.25);
-    for (const x of [-1.1, 1.1]) add(rb(0.18, 2.6, 0.18, C.steel, { r: 0.04 }), x, 1.5);
-    const plate = add(rb(2.6, 0.4, 2.0, C.model, { r: 0.08, glow: 0.25 }), 0, 2.2);
-    press.userData.glow = [base, plate];
-    press.userData.h = 3.0;
-    const ce = c.obj(press, 0, 0, 'Cross-encoder', 'query + chunk → one score');
-    c.tick(t => { const k = t > 3.6 && t < 7.4 ? Math.abs(Math.sin((t - 3.6) * Math.PI * 1.3)) : 1; plate.position.y = 0.9 + 1.3 * k; });
-    const list = c.obj('cards', 5.6, 0, 'Top 5', 're-ordered');
-    const llm = c.obj('modelGem', 10, 0, 'LLM', 'answers from the top 5');
-    c.lane([V(-11, 0), V(-6.2, 0)]);
-    c.lane([V(-6.2, 0), V(0, 0), V(5.6, 0), V(10, 0)]);
-    c.packet({ pts: [V(-11, 0), V(-6.2, 0)], t0: 0.2, t1: 1.2, kind: 'ask', from: usr, to: idx, label: 'FY2023 op margin?' });
-    const zs = [-3.6, -2.6, -1.6, -0.6, 0.4, 1.4, 2.4, 3.4];
-    zs.forEach((z, i) => c.packet({ pts: [c.top(idx, 0), V(-3.4, z, 1.4), V(-1.8, z * 0.25, 1.2), V(-1.4, 0, 1.0)], t0: 1.8 + i * 0.14, t1: 3.4 + i * 0.45, kind: 'chunk', to: ce, label: i === 0 ? 'gross margin 44.1%' : i === 3 ? 'FY2022 figures' : i === 6 ? 'FY2023 statement' : undefined }));
-    zs.forEach((z, i) => c.packet({ pts: [V(-9, -1.2, 1.0), V(-1.4, -0.4, 1.0)], t0: 3.4 + i * 0.45 - 0.9, t1: 3.4 + i * 0.45, kind: 'ask', s: 0.6 }));
-    const scores = [['0.98', P.ship], ['0.90', P.ship], ['0.86', P.ship], ['0.71', P.chunk], ['0.57', P.chunk]];
-    scores.forEach(([s, col], i) => c.packet({ pts: [c.top(ce, 0), V(3, 0, 2.2), c.top(list, 0.2)], t0: 7.4 + i * 0.25, t1: 8.4 + i * 0.25, kind: 'doc', color: i === 0 ? P.ans : P.doc, to: list, label: i === 0 ? '#1 · FY2023 statement · 0.98' : undefined }));
-    c.packet({ pts: [c.top(ce, 0), V(1.5, 3.4, 1.0), V(1.5, 5.2, 0.4)], t0: 7.4, t1: 8.6, kind: 'chunk', color: P.bad, n: 3, st: 0.3, label: 'lookalikes sink' });
-    c.packet({ pts: arc(c.top(list, 0), c.top(llm, 0), 2), t0: 9.6, t1: 10.6, kind: 'env', to: llm, label: 'top 5 + question' });
-    c.packet({ pts: [c.top(llm, 0), V(10, 3.6, 1.2)], t0: 11.0, t1: 12.0, kind: 'doc', color: P.ans, label: '≈ 29.8% [chunk A]' });
-    c.note('<b>retrieve wide</b> · recall', -3.4, 4.8);
-    c.note('<b>rerank narrow</b> · precision', 3.0, 4.8);
-  },
-};
-boot(D);
 </script>
 </body>
 </html>

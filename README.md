@@ -30,11 +30,6 @@ Then the retrieval and model track:
 
 Coming next: agent memory, production, and fine-tuning.
 
-## Go deeper
-
-- [Agentic system designs](https://devlcodes.github.io/agentic-ai-notebook/system-design/): end-to-end designs of real agentic systems, in a field-manual style
-- [Classic system design](https://github.com/DevLCodes/classic-system-designs): load balancing, caching, sharding, and walkthroughs such as a URL shortener and ride matching
-
 ## Contributing
 
 Plain static HTML with no build step, served by GitHub Pages from `main`. Each page inlines its own CSS; read [STYLES.md](STYLES.md) before adding one.
